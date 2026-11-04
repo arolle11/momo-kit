@@ -1,0 +1,69 @@
+{
+  "name": "momo-kit",
+  "version": "0.1.0",
+  "description": "Phone numbers, mobile money operators and FCFA amounts for French-speaking Africa.",
+  "keywords": [
+    "mobile money",
+    "momo",
+    "orange money",
+    "mtn",
+    "moov",
+    "wave",
+    "phone",
+    "validation",
+    "fcfa",
+    "xaf",
+    "xof",
+    "cameroun",
+    "senegal",
+    "cote d'ivoire",
+    "benin",
+    "togo",
+    "burkina faso",
+    "mali",
+    "niger",
+    "congo",
+    "africa"
+  ],
+  "license": "MIT",
+  "author": "Arolle Fona <arollefona11@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arolle11/momo-kit.git"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "tsup": "^9.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.0"
+  }
+}
