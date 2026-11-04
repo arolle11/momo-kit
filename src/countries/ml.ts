@@ -2,13 +2,7 @@ import type { CountryData } from "../types";
 
 export const ML: CountryData = {
   code: "ML",
-  name: "Mali",
-  dialCode: "223",
   currency: "XOF",
-  nationalLength: 8,
-  mobilePrefixes: ["6", "7", "8", "9"],
-  fixedPrefixes: ["20", "21", "44"],
-  groups: [2, 2, 2, 2],
   operators: [
     {
       name: "Orange",

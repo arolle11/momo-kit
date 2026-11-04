@@ -2,13 +2,8 @@ import type { CountryData } from "../types";
 
 export const BJ: CountryData = {
   code: "BJ",
-  name: "Bénin",
-  dialCode: "229",
   currency: "XOF",
-  nationalLength: 10,
-  mobilePrefixes: ["01"],
-  fixedPrefixes: ["0120", "0121", "0122", "0123", "0124"],
-  groups: [2, 2, 2, 2, 2],
+  legacy: { length: 8, prefix: "01" },
   operators: [
     {
       name: "MTN",

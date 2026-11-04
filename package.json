@@ -1,7 +1,7 @@
 {
   "name": "momo-kit",
   "version": "0.1.0",
-  "description": "Phone numbers, mobile money operators and FCFA amounts for French-speaking Africa.",
+  "description": "Mobile money operators and FCFA amounts for African apps, on top of libphonenumber-js.",
   "keywords": [
     "mobile money",
     "momo",
@@ -65,5 +65,8 @@
     "tsup": "^9.0.0",
     "typescript": "^5.9.3",
     "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "libphonenumber-js": "^1.13.15"
   }
 }

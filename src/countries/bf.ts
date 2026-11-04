@@ -2,13 +2,7 @@ import type { CountryData } from "../types";
 
 export const BF: CountryData = {
   code: "BF",
-  name: "Burkina Faso",
-  dialCode: "226",
   currency: "XOF",
-  nationalLength: 8,
-  mobilePrefixes: ["0", "5", "6", "7"],
-  fixedPrefixes: ["2"],
-  groups: [2, 2, 2, 2],
   operators: [
     {
       name: "Orange",

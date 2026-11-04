@@ -1,105 +1,82 @@
-import { findCountryByDialCode, getCountry } from "./countries";
+import { parsePhoneNumberFromString, type PhoneNumber } from "libphonenumber-js/max";
+import { getCountry } from "./countries";
 import type { CountryCode, CountryData, LineType, Operator, PhoneInfo } from "./types";
 
-interface Resolved {
-  country: CountryData;
-  national: string;
+function clean(input: string): string {
+  return input.replace(/[\s.\-()/]/g, "");
 }
 
-function longestMatch(national: string, prefixes: string[]): number {
-  let best = 0;
-  for (const prefix of prefixes) {
-    if (prefix.length > best && national.startsWith(prefix)) best = prefix.length;
-  }
-  return best;
+function upgradeLegacy(phone: PhoneNumber): PhoneNumber {
+  if (phone.isValid()) return phone;
+  const legacy = getCountry(phone.country)?.legacy;
+  const national = phone.nationalNumber as string;
+  if (!legacy || national.length !== legacy.length || national.startsWith(legacy.prefix)) return phone;
+  return parsePhoneNumberFromString(`+${phone.countryCallingCode}${legacy.prefix}${national}`) ?? phone;
 }
 
-function resolve(input: string, countryCode?: CountryCode): Resolved | null {
-  let digits = input.replace(/[\s.\-()/]/g, "");
-  let international = false;
+function read(input: string, country?: CountryCode): PhoneNumber | null {
+  const digits = clean(input);
+  if (!digits) return null;
 
-  if (digits.startsWith("+")) {
-    digits = digits.slice(1);
-    international = true;
-  } else if (digits.startsWith("00")) {
-    digits = digits.slice(2);
-    international = true;
+  const international = digits.startsWith("+") || digits.startsWith("00");
+  const attempts = international || country ? [digits] : [`+${digits}`];
+  if (country && !international) attempts.push(`+${digits}`);
+
+  for (const attempt of attempts) {
+    const parsed = parsePhoneNumberFromString(attempt.replace(/^00/, "+"), country);
+    if (!parsed) continue;
+    if (country && parsed.country !== country) continue;
+    const phone = upgradeLegacy(parsed);
+    if (phone.isValid()) return phone;
   }
-
-  if (!/^\d+$/.test(digits)) return null;
-
-  if (international) {
-    const country = countryCode ? getCountry(countryCode) : findCountryByDialCode(digits);
-    if (!country || !digits.startsWith(country.dialCode)) return null;
-    return { country, national: digits.slice(country.dialCode.length) };
-  }
-
-  if (!countryCode) return null;
-  const country = getCountry(countryCode);
-  if (digits.length === country.dialCode.length + country.nationalLength && digits.startsWith(country.dialCode)) {
-    return { country, national: digits.slice(country.dialCode.length) };
-  }
-  return { country, national: digits };
+  return null;
 }
 
-function lineType(national: string, country: CountryData): LineType | null {
-  const mobile = longestMatch(national, country.mobilePrefixes);
-  const fixed = longestMatch(national, country.fixedPrefixes);
-  if (!mobile && !fixed) return null;
-  return fixed > mobile ? "fixed" : "mobile";
+function lineType(phone: PhoneNumber): LineType {
+  const type = phone.getType();
+  if (type === "MOBILE" || type === "FIXED_LINE_OR_MOBILE") return "mobile";
+  if (type === "FIXED_LINE") return "fixed";
+  return "other";
 }
 
-function findOperator(national: string, country: CountryData): Operator | null {
+function findOperator(national: string, country: CountryData | null): Operator | null {
+  if (!country) return null;
   let best: Operator | null = null;
   let bestLength = 0;
   for (const operator of country.operators) {
-    const length = longestMatch(national, operator.prefixes);
-    if (length > bestLength) {
-      best = operator;
-      bestLength = length;
+    for (const prefix of operator.prefixes) {
+      if (prefix.length > bestLength && national.startsWith(prefix)) {
+        best = operator;
+        bestLength = prefix.length;
+      }
     }
   }
   return best;
 }
 
-function group(national: string, sizes: number[]): string {
-  const parts: string[] = [];
-  let index = 0;
-  for (const size of sizes) {
-    parts.push(national.slice(index, index + size));
-    index += size;
-  }
-  if (index < national.length) parts.push(national.slice(index));
-  return parts.filter(Boolean).join(" ");
-}
-
 export function parse(input: string, country?: CountryCode): PhoneInfo | null {
-  const resolved = resolve(input, country);
-  if (!resolved) return null;
+  const phone = read(input, country);
+  if (!phone?.country) return null;
 
-  const { country: data, national } = resolved;
-  if (national.length !== data.nationalLength) return null;
-
-  const type = lineType(national, data);
-  if (!type) return null;
-
-  const operator = findOperator(national, data);
+  const national = phone.nationalNumber as string;
+  const type = lineType(phone);
+  const operator = findOperator(national, getCountry(phone.country));
   return {
-    country: data.code,
+    country: phone.country,
     national,
-    international: `+${data.dialCode}${national}`,
+    international: phone.number as string,
     type,
     operator: operator?.name ?? null,
-    wallet: operator?.wallet ?? null,
+    wallet: type === "mobile" ? (operator?.wallet ?? null) : null,
   };
 }
 
 export function isValid(input: string, country?: CountryCode): boolean {
-  return parse(input, country) !== null;
+  return read(input, country) !== null;
 }
 
 export function normalize(input: string, country?: CountryCode): string | null {
-  return parse(input, country)?.international ?? null;
+  return read(input, country)?.number ?? null;
 }
 
 export function detectOperator(
@@ -116,9 +93,7 @@ export function format(
   country?: CountryCode,
   style: "national" | "international" = "national",
 ): string | null {
-  const info = parse(input, country);
-  if (!info) return null;
-  const data = getCountry(info.country);
-  const national = group(info.national, data.groups);
-  return style === "international" ? `+${data.dialCode} ${national}` : national;
+  const phone = read(input, country);
+  if (!phone) return null;
+  return style === "international" ? phone.formatInternational() : phone.formatNational();
 }

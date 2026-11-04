@@ -1,4 +1,8 @@
-export type CountryCode = "BF" | "BJ" | "CG" | "CI" | "CM" | "ML" | "NE" | "SN" | "TG";
+import type { CountryCode } from "libphonenumber-js";
+
+export type { CountryCode };
+
+export type SupportedCountry = "BF" | "BJ" | "CG" | "CI" | "CM" | "ML" | "NE" | "SN" | "TG";
 
 export interface Operator {
   name: string;
@@ -7,18 +11,13 @@ export interface Operator {
 }
 
 export interface CountryData {
-  code: CountryCode;
-  name: string;
-  dialCode: string;
+  code: SupportedCountry;
   currency: "XAF" | "XOF";
-  nationalLength: number;
-  mobilePrefixes: string[];
-  fixedPrefixes: string[];
-  groups: number[];
+  legacy?: { length: number; prefix: string };
   operators: Operator[];
 }
 
-export type LineType = "mobile" | "fixed";
+export type LineType = "mobile" | "fixed" | "other";
 
 export interface PhoneInfo {
   country: CountryCode;

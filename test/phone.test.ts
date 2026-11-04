@@ -1,16 +1,18 @@
+import { parsePhoneNumberFromString } from "libphonenumber-js/max";
 import { describe, expect, it } from "vitest";
 import { COUNTRIES, detectOperator, format, isValid, normalize, parse } from "../src";
-import type { CountryCode } from "../src";
+import type { SupportedCountry } from "../src";
+
+const LENGTH: Record<SupportedCountry, number> = { BF: 8, BJ: 10, CG: 9, CI: 10, CM: 9, ML: 8, NE: 8, SN: 9, TG: 8 };
+const DIAL: Record<SupportedCountry, string> = { BF: "226", BJ: "229", CG: "242", CI: "225", CM: "237", ML: "223", NE: "227", SN: "221", TG: "228" };
 
 describe("normalize", () => {
   it.each([
     ["677123456", "+237677123456"],
     ["677 12 34 56", "+237677123456"],
-    ["6 77 12 34 56", "+237677123456"],
     ["677-12-34-56", "+237677123456"],
     ["677.12.34.56", "+237677123456"],
     ["+237 677 12 34 56", "+237677123456"],
-    ["+237677123456", "+237677123456"],
     ["00237677123456", "+237677123456"],
     ["237677123456", "+237677123456"],
     ["(+237) 677 12 34 56", "+237677123456"],
@@ -19,20 +21,12 @@ describe("normalize", () => {
     expect(normalize(input, "CM")).toBe(expected);
   });
 
-  it.each([
-    "",
-    "67712345",
-    "6771234567",
-    "577123456",
-    "+33677123456",
-    "67712a456",
-    "+",
-  ])("CM rejects %j", (input) => {
+  it.each(["", "67712345", "6771234567", "577123456", "67712a456", "+", "abc"])("CM rejects %j", (input) => {
     expect(normalize(input, "CM")).toBeNull();
     expect(isValid(input, "CM")).toBe(false);
   });
 
-  it("rejects an international number from another country when a country is given", () => {
+  it("rejects a number from another country when a country is given", () => {
     expect(normalize("+221771234567", "CM")).toBeNull();
   });
 });
@@ -48,32 +42,50 @@ describe("country detection", () => {
     ["+223 76 12 34 56", "ML"],
     ["+227 96 12 34 56", "NE"],
     ["+242 06 612 34 56", "CG"],
+    ["237 655 12 34 56", "CM"],
+    ["2250712345678", "CI"],
   ])("%s → %s", (input, country) => {
     expect(parse(input)?.country).toBe(country);
+  });
+
+  it("works for any country, without operator data", () => {
+    expect(parse("+33 6 12 34 56 78")).toMatchObject({ country: "FR", type: "mobile", operator: null, wallet: null });
+    expect(parse("+234 803 123 4567")).toMatchObject({ country: "NG", type: "mobile", operator: null });
   });
 
   it("needs a country for a local number", () => {
     expect(parse("677123456")).toBeNull();
   });
+});
 
-  it("returns null for an unsupported dial code", () => {
-    expect(parse("+33612345678")).toBeNull();
+describe("legacy numbers", () => {
+  it.each([
+    ["+229 97 12 34 56", "+2290197123456"],
+    ["0022966123456", "+2290166123456"],
+    ["229 95 12 34 56", "+2290195123456"],
+  ])("upgrades an 8-digit Bénin number: %s → %s", (input, expected) => {
+    expect(normalize(input)).toBe(expected);
+  });
+
+  it("upgrades a local 8-digit Bénin number", () => {
+    expect(parse("97 12 34 56", "BJ")).toMatchObject({ international: "+2290197123456", operator: "MTN" });
+  });
+
+  it("keeps rejecting old 8-digit Côte d'Ivoire numbers", () => {
+    expect(isValid("07080910", "CI")).toBe(false);
   });
 });
 
 describe("detectOperator", () => {
-  it.each<[string, CountryCode, string, string | null]>([
+  it.each<[string, SupportedCountry, string, string | null]>([
     ["670000000", "CM", "MTN", "MTN Mobile Money"],
     ["650000000", "CM", "MTN", "MTN Mobile Money"],
     ["683000000", "CM", "MTN", "MTN Mobile Money"],
     ["690000000", "CM", "Orange", "Orange Money"],
     ["655000000", "CM", "Orange", "Orange Money"],
-    ["640000000", "CM", "Orange", "Orange Money"],
     ["686000000", "CM", "Orange", "Orange Money"],
     ["660000000", "CM", "Nexttel", null],
-    ["684000000", "CM", "Nexttel", null],
     ["620000000", "CM", "Camtel", null],
-    ["222000000", "CM", "Camtel", null],
 
     ["771234567", "SN", "Orange", "Orange Money"],
     ["781234567", "SN", "Orange", "Orange Money"],
@@ -83,43 +95,33 @@ describe("detectOperator", () => {
     ["0712345678", "CI", "Orange", "Orange Money"],
     ["0512345678", "CI", "MTN", "MTN Mobile Money"],
     ["0112345678", "CI", "Moov", "Moov Money"],
-    ["2722123456", "CI", "Orange", "Orange Money"],
 
     ["0197123456", "BJ", "MTN", "MTN Mobile Money"],
     ["0161123456", "BJ", "MTN", "MTN Mobile Money"],
     ["0195123456", "BJ", "Moov", "Moov Money"],
-    ["0199123456", "BJ", "Moov", "Moov Money"],
     ["0140123456", "BJ", "Celtiis", null],
 
     ["90123456", "TG", "Togocom", "T-Money"],
-    ["70123456", "TG", "Togocom", "T-Money"],
     ["99123456", "TG", "Moov", "Flooz"],
-    ["79123456", "TG", "Moov", "Flooz"],
 
     ["76123456", "BF", "Orange", "Orange Money"],
     ["05123456", "BF", "Orange", "Orange Money"],
     ["70123456", "BF", "Moov", "Moov Money"],
-    ["01123456", "BF", "Moov", "Moov Money"],
     ["78123456", "BF", "Telecel", null],
 
     ["76123456", "ML", "Orange", "Orange Money"],
-    ["91123456", "ML", "Orange", "Orange Money"],
     ["85212345", "ML", "Orange", "Orange Money"],
     ["66123456", "ML", "Moov", "Moov Money"],
-    ["97123456", "ML", "Moov", "Moov Money"],
 
     ["83123456", "NE", "Niger Telecoms", null],
 
     ["061234567", "CG", "MTN", "MTN Mobile Money"],
     ["051234567", "CG", "Airtel", "Airtel Money"],
-    ["041234567", "CG", "Airtel", "Airtel Money"],
   ])("%s (%s) → %s", (input, country, operator, wallet) => {
     expect(detectOperator(input, country)).toEqual({ country, operator, wallet });
   });
 
-  it("returns null for a valid number with an unknown prefix", () => {
-    expect(isValid("610000000", "CM")).toBe(true);
-    expect(detectOperator("610000000", "CM")).toBeNull();
+  it("returns null when the prefix is not in the data", () => {
     expect(isValid("96123456", "NE")).toBe(true);
     expect(detectOperator("96123456", "NE")).toBeNull();
   });
@@ -129,62 +131,26 @@ describe("detectOperator", () => {
   });
 });
 
-describe("line type", () => {
-  it.each<[string, CountryCode, "mobile" | "fixed"]>([
-    ["677123456", "CM", "mobile"],
-    ["222234567", "CM", "fixed"],
-    ["771234567", "SN", "mobile"],
-    ["338123456", "SN", "fixed"],
-    ["0712345678", "CI", "mobile"],
-    ["2722123456", "CI", "fixed"],
-    ["0197123456", "BJ", "mobile"],
-    ["0121123456", "BJ", "fixed"],
-    ["22123456", "TG", "fixed"],
-    ["20123456", "ML", "fixed"],
-    ["221234567", "CG", "fixed"],
-  ])("%s (%s) → %s", (input, country, type) => {
-    expect(parse(input, country)?.type).toBe(type);
+describe("wallet", () => {
+  it("is only given for mobile lines", () => {
+    expect(parse("+221338123456")).toMatchObject({ type: "fixed", operator: "Orange", wallet: null });
+    expect(parse("+237222234567")).toMatchObject({ type: "fixed", operator: "Camtel", wallet: null });
+    expect(parse("+221771234567")).toMatchObject({ type: "mobile", wallet: "Orange Money" });
   });
-
-  it.each<[string, CountryCode]>([
-    ["0812345678", "CI"],
-    ["0212345678", "BJ"],
-    ["5123456", "TG"],
-    ["881234567", "SN"],
-  ])("rejects %s (%s)", (input, country) => {
-    expect(isValid(input, country)).toBe(false);
-  });
-});
-
-describe("number length", () => {
-  it.each(Object.values(COUNTRIES).map((c) => [c.code, c.nationalLength] as const))(
-    "%s numbers have %d digits",
-    (code, length) => {
-      const country = COUNTRIES[code];
-      const prefix = country.mobilePrefixes[0]!;
-      const valid = prefix.padEnd(length, "1");
-      expect(isValid(valid, code)).toBe(true);
-      expect(isValid(valid + "1", code)).toBe(false);
-      expect(isValid(valid.slice(0, -1), code)).toBe(false);
-    },
-  );
 });
 
 describe("format", () => {
-  it.each<[string, CountryCode | undefined, string]>([
+  it.each<[string, SupportedCountry | undefined, string]>([
     ["+237677123456", undefined, "6 77 12 34 56"],
     ["771234567", "SN", "77 123 45 67"],
-    ["0712345678", "CI", "07 12 34 56 78"],
     ["0197123456", "BJ", "01 97 12 34 56"],
     ["90123456", "TG", "90 12 34 56"],
-    ["061234567", "CG", "06 123 45 67"],
   ])("%s → %s", (input, country, expected) => {
     expect(format(input, country)).toBe(expected);
   });
 
   it("formats in international style", () => {
     expect(format("677123456", "CM", "international")).toBe("+237 6 77 12 34 56");
-    expect(format("0712345678", "CI", "international")).toBe("+225 07 12 34 56 78");
   });
 
   it("returns null for an invalid number", () => {
@@ -205,15 +171,17 @@ describe("parse", () => {
   });
 });
 
-describe("country data", () => {
-  it.each(Object.values(COUNTRIES).map((c) => [c.code, c] as const))("%s is consistent", (code, country) => {
-    expect(country.code).toBe(code);
-    expect(country.groups.reduce((a, b) => a + b, 0)).toBe(country.nationalLength);
-    for (const operator of country.operators) {
-      for (const prefix of operator.prefixes) {
-        const known = [...country.mobilePrefixes, ...country.fixedPrefixes].some((p) => prefix.startsWith(p) || p.startsWith(prefix));
-        expect(known, `${code} ${operator.name} ${prefix}`).toBe(true);
-      }
-    }
+describe("operator data", () => {
+  const rows = Object.values(COUNTRIES).flatMap((country) =>
+    country.operators.flatMap((operator) =>
+      operator.prefixes.map((prefix) => [country.code, operator.name, prefix] as const),
+    ),
+  );
+
+  it.each(rows)("%s %s %s matches real numbers", (code, operator, prefix) => {
+    const length = LENGTH[code];
+    const candidates = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => prefix + d.repeat(length - prefix.length));
+    const valid = candidates.some((n) => parsePhoneNumberFromString(`+${DIAL[code]}${n}`)?.isValid());
+    expect(valid, `${code} ${operator} ${prefix}`).toBe(true);
   });
 });

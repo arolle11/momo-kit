@@ -2,13 +2,7 @@ import type { CountryData } from "../types";
 
 export const CM: CountryData = {
   code: "CM",
-  name: "Cameroun",
-  dialCode: "237",
   currency: "XAF",
-  nationalLength: 9,
-  mobilePrefixes: ["6"],
-  fixedPrefixes: ["2"],
-  groups: [1, 2, 2, 2, 2],
   operators: [
     {
       name: "MTN",
