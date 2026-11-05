@@ -1,6 +1,6 @@
 import { parsePhoneNumberFromString, type PhoneNumber } from "libphonenumber-js/max";
 import { getCountry } from "./countries";
-import type { CountryCode, CountryData, LineType, Operator, PhoneInfo } from "./types";
+import type { CountryCode, CountryData, LineType, Operator, OperatorInfo, PhoneInfo, Provider } from "./types";
 
 function clean(input: string): string {
   return input.replace(/[\s.\-()/]/g, "");
@@ -54,20 +54,28 @@ function findOperator(national: string, country: CountryData | null): Operator |
   return best;
 }
 
-export function parse(input: string, country?: CountryCode): PhoneInfo | null {
+function resolveOperator(input: string, country?: CountryCode) {
   const phone = read(input, country);
   if (!phone?.country) return null;
-
   const national = phone.nationalNumber as string;
   const type = lineType(phone);
   const operator = findOperator(national, getCountry(phone.country));
+  return { phone, country: phone.country, national, type, operator };
+}
+
+export function parse(input: string, country?: CountryCode): PhoneInfo | null {
+  const resolved = resolveOperator(input, country);
+  if (!resolved) return null;
+  const { phone, national, type, operator } = resolved;
   return {
-    country: phone.country,
+    country: resolved.country,
     national,
     international: phone.number as string,
     type,
+    operatorId: operator?.id ?? null,
     operator: operator?.name ?? null,
     wallet: type === "mobile" ? (operator?.wallet ?? null) : null,
+    color: operator?.color ?? null,
   };
 }
 
@@ -79,13 +87,16 @@ export function normalize(input: string, country?: CountryCode): string | null {
   return read(input, country)?.number ?? null;
 }
 
-export function detectOperator(
-  input: string,
-  country?: CountryCode,
-): { country: CountryCode; operator: string; wallet: string | null } | null {
+export function detectOperator(input: string, country?: CountryCode): OperatorInfo | null {
   const info = parse(input, country);
-  if (!info?.operator) return null;
-  return { country: info.country, operator: info.operator, wallet: info.wallet };
+  if (!info?.operator || !info.operatorId) return null;
+  return { country: info.country, id: info.operatorId, operator: info.operator, wallet: info.wallet, color: info.color };
+}
+
+export function getProviderCode(input: string, provider: Provider, country?: CountryCode): string | null {
+  const resolved = resolveOperator(input, country);
+  if (!resolved || resolved.type !== "mobile") return null;
+  return resolved.operator?.providers?.[provider] ?? null;
 }
 
 export function format(

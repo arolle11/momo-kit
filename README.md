@@ -4,7 +4,8 @@ Mobile money operators and FCFA amounts for African apps.
 
 `momo-kit` builds on [libphonenumber-js](https://github.com/catamphetamine/libphonenumber-js) for phone number validation and adds what it does not cover:
 
-- **Which operator and which wallet** a number belongs to (MTN Mobile Money, Orange Money, Moov Money, T-Money, Flooz…), to preselect the right payment method or route to the right API
+- **Which operator and which wallet** a number belongs to (MTN Mobile Money, Orange Money, Moov Money, T-Money, Flooz…), to preselect the right payment method
+- **The payment provider code** for that number (`MTN_MOMO_CMR` for pawaPay…), to route the payment to the right API
 - **FCFA amounts** formatted the French way (`15 000 FCFA`) and written in words for invoices and receipts (`quinze mille francs CFA`)
 - **Real-world inputs**: old 8-digit Bénin numbers, dial codes typed without `+`
 
@@ -19,9 +20,11 @@ npm install momo-kit
 ```ts
 import { detectOperator, parse } from "momo-kit";
 
-detectOperator("+237 677 12 34 56");   // { country: "CM", operator: "MTN", wallet: "MTN Mobile Money" }
-detectOperator("05 12 34 56 78", "CI");  // { country: "CI", operator: "MTN", wallet: "MTN Mobile Money" }
-detectOperator("90 12 34 56", "TG");     // { country: "TG", operator: "Togocom", wallet: "T-Money" }
+detectOperator("+237 677 12 34 56");
+// { country: "CM", id: "mtn", operator: "MTN", wallet: "MTN Mobile Money", color: "#FFCC01" }
+
+detectOperator("90 12 34 56", "TG");
+// { country: "TG", id: "togocom", operator: "Togocom", wallet: "T-Money", color: null }
 
 parse("+229 97 12 34 56");
 // {
@@ -29,12 +32,33 @@ parse("+229 97 12 34 56");
 //   national: "0197123456",
 //   international: "+2290197123456",
 //   type: "mobile",
+//   operatorId: "mtn",
 //   operator: "MTN",
-//   wallet: "MTN Mobile Money"
+//   wallet: "MTN Mobile Money",
+//   color: "#FFCC01"
 // }
 ```
 
+`id` is the same for an operator in every country (`orange` in Cameroun, Sénégal, Côte d'Ivoire…), so you can map it to your own logos. `color` is the operator's main brand color, or `null` when it is not in the data. Logos are not included: they are trademarks of each operator.
+
 The wallet is only returned for mobile lines. The operator is the one the prefix was originally assigned to: with number portability, a subscriber may have moved to another operator since.
+
+## Payment providers
+
+```ts
+import { getProviderCode } from "momo-kit";
+
+getProviderCode("+237 677 12 34 56", "pawapay");      // "MTN_MOMO_CMR"
+getProviderCode("+221 76 123 45 67", "pawapay");      // "FREE_SEN"
+getProviderCode("97 12 34 56", "pawapay", "BJ");      // "MTN_MOMO_BEN"
+getProviderCode("+228 90 12 34 56", "pawapay");       // null, not supported by pawaPay
+```
+
+| Provider | Countries |
+| --- | --- |
+| [pawaPay](https://docs.pawapay.io/v2/docs/providers) | Bénin, Burkina Faso, Cameroun, Congo, Côte d'Ivoire, Sénégal |
+
+Wave works with any phone number, so it cannot be detected from the number: offer it as a separate choice.
 
 ## Phone numbers
 

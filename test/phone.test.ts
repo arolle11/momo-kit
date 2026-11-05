@@ -1,6 +1,6 @@
 import { parsePhoneNumberFromString } from "libphonenumber-js/max";
 import { describe, expect, it } from "vitest";
-import { COUNTRIES, detectOperator, format, isValid, normalize, parse } from "../src";
+import { COUNTRIES, detectOperator, format, getProviderCode, isValid, normalize, parse } from "../src";
 import type { SupportedCountry } from "../src";
 
 const LENGTH: Record<SupportedCountry, number> = { BF: 8, BJ: 10, CG: 9, CI: 10, CM: 9, ML: 8, NE: 8, SN: 9, TG: 8 };
@@ -118,7 +118,7 @@ describe("detectOperator", () => {
     ["061234567", "CG", "MTN", "MTN Mobile Money"],
     ["051234567", "CG", "Airtel", "Airtel Money"],
   ])("%s (%s) → %s", (input, country, operator, wallet) => {
-    expect(detectOperator(input, country)).toEqual({ country, operator, wallet });
+    expect(detectOperator(input, country)).toMatchObject({ country, operator, wallet });
   });
 
   it("returns null when the prefix is not in the data", () => {
@@ -165,9 +165,67 @@ describe("parse", () => {
       national: "699000000",
       international: "+237699000000",
       type: "mobile",
+      operatorId: "orange",
       operator: "Orange",
       wallet: "Orange Money",
+      color: "#FF7900",
     });
+  });
+});
+
+describe("operator identity", () => {
+  it("returns a stable id and the brand color", () => {
+    expect(detectOperator("+237 677 12 34 56")).toEqual({
+      country: "CM",
+      id: "mtn",
+      operator: "MTN",
+      wallet: "MTN Mobile Money",
+      color: "#FFCC01",
+    });
+    expect(detectOperator("+242 05 123 45 67")).toMatchObject({ id: "airtel", color: "#ED1C24" });
+    expect(detectOperator("90 12 34 56", "TG")).toMatchObject({ id: "togocom", color: null });
+  });
+
+  it("uses the same id for an operator in every country", () => {
+    expect(detectOperator("+221771234567")?.id).toBe("orange");
+    expect(detectOperator("+2250712345678")?.id).toBe("orange");
+    expect(detectOperator("+22676123456")?.id).toBe("orange");
+  });
+});
+
+describe("getProviderCode", () => {
+  it.each([
+    ["+237 677 12 34 56", "MTN_MOMO_CMR"],
+    ["+237 699 00 00 00", "ORANGE_CMR"],
+    ["+225 05 12 34 56 78", "MTN_MOMO_CIV"],
+    ["+225 07 12 34 56 78", "ORANGE_CIV"],
+    ["+225 01 12 34 56 78", "MOOV_CIV"],
+    ["+221 77 123 45 67", "ORANGE_SEN"],
+    ["+221 76 123 45 67", "FREE_SEN"],
+    ["+229 01 97 12 34 56", "MTN_MOMO_BEN"],
+    ["+229 01 95 12 34 56", "MOOV_BEN"],
+    ["+229 97 12 34 56", "MTN_MOMO_BEN"],
+    ["+226 76 12 34 56", "ORANGE_BFA"],
+    ["+226 70 12 34 56", "MOOV_BFA"],
+    ["+242 06 612 34 56", "MTN_MOMO_COG"],
+    ["+242 05 123 45 67", "AIRTEL_COG"],
+  ])("pawapay %s → %s", (input, code) => {
+    expect(getProviderCode(input, "pawapay")).toBe(code);
+  });
+
+  it("accepts a local number with its country", () => {
+    expect(getProviderCode("677 12 34 56", "pawapay", "CM")).toBe("MTN_MOMO_CMR");
+  });
+
+  it("returns null when the provider does not support the operator", () => {
+    expect(getProviderCode("+237 660 00 00 00", "pawapay")).toBeNull();
+    expect(getProviderCode("+228 90 12 34 56", "pawapay")).toBeNull();
+    expect(getProviderCode("+221 70 123 45 67", "pawapay")).toBeNull();
+  });
+
+  it("returns null for fixed lines and invalid numbers", () => {
+    expect(getProviderCode("+221 33 812 34 56", "pawapay")).toBeNull();
+    expect(getProviderCode("123", "pawapay", "CM")).toBeNull();
   });
 });
 
@@ -177,6 +235,15 @@ describe("operator data", () => {
       operator.prefixes.map((prefix) => [country.code, operator.name, prefix] as const),
     ),
   );
+
+  it("has a valid color and id for every operator", () => {
+    for (const country of Object.values(COUNTRIES)) {
+      for (const operator of country.operators) {
+        expect(operator.id).toMatch(/^[a-z]+(-[a-z]+)*$/);
+        if (operator.color) expect(operator.color).toMatch(/^#[0-9A-F]{6}$/);
+      }
+    }
+  });
 
   it.each(rows)("%s %s %s matches real numbers", (code, operator, prefix) => {
     const length = LENGTH[code];

@@ -5,15 +5,27 @@ export const BF: CountryData = {
   currency: "XOF",
   operators: [
     {
+      id: "orange",
       name: "Orange",
       wallet: "Orange Money",
+      color: "#FF7900",
       prefixes: ["05", "06", "07", "54", "55", "56", "57", "64", "65", "66", "67", "74", "75", "76", "77"],
+      providers: { pawapay: "ORANGE_BFA" },
     },
     {
+      id: "moov",
       name: "Moov",
       wallet: "Moov Money",
+      color: null,
       prefixes: ["01", "02", "03", "50", "51", "52", "53", "60", "61", "62", "63", "70", "71", "72", "73"],
+      providers: { pawapay: "MOOV_BFA" },
     },
-    { name: "Telecel", wallet: null, prefixes: ["68", "69", "78", "79"] },
+    {
+      id: "telecel",
+      name: "Telecel",
+      wallet: null,
+      color: null,
+      prefixes: ["68", "69", "78", "79"],
+    },
   ],
 };
