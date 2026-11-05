@@ -1,6 +1,6 @@
 {
   "name": "momo-kit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Mobile money operators and FCFA amounts for African apps, on top of libphonenumber-js.",
   "keywords": [
     "mobile money",
